@@ -21,7 +21,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.exceptions import ValidationError
 
 
-@api_view(['GET', 'PUT', 'PATCH'])
+@api_view(['GET', 'PUT', 'PATCH', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def current_user_view(request):
     profile = request.user.profile
@@ -33,6 +33,16 @@ def current_user_view(request):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
+    elif request.method == 'DELETE':
+        try:
+            # Delete the user (this will cascade delete the profile due to CASCADE in Profile model)
+            request.user.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 
 # Create or list user's particulars
@@ -54,6 +64,12 @@ class ParticularDetailUpdateView(RetrieveUpdateAPIView):
 
     def get_queryset(self):
         return Particular.objects.filter(user=self.request.user)
+
+    def delete(self, request, *args, **kwargs):
+        particular = self.get_object()
+        # Delete will cascade to reminders due to CASCADE in model
+        particular.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 # Search user's particulars by title

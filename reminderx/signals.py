@@ -21,8 +21,8 @@ def create_or_update_user_profile(sender, instance, created, **kwargs):
 @receiver(post_migrate)
 def create_subscription_plans(sender, **kwargs):
     plans = [
-        {"name": "free", "max_particulars": 9999, "max_reminders_per_particular": 2, "allow_recurring": False},
-        {"name": "premium", "max_particulars": 20, "max_reminders_per_particular": 10, "allow_recurring": True},
+        {"name": "free", "max_particulars": 9999, "max_reminders_per_particular": 9999, "allow_recurring": True},
+        {"name": "premium", "max_particulars": 9999, "max_reminders_per_particular": 9999, "allow_recurring": True},
         {"name": "enterprise", "max_particulars": 9999, "max_reminders_per_particular": 9999, "allow_recurring": True},
     ]
     for plan in plans:
