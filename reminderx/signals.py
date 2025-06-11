@@ -1,4 +1,4 @@
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, post_migrate
 from django.dispatch import receiver
 from django.contrib.auth.models import User
 from .models import Profile, SubscriptionPlan
@@ -17,3 +17,13 @@ def create_or_update_user_profile(sender, instance, created, **kwargs):
         # Update existing profile (if it exists)
         if hasattr(instance, "profile"):
             instance.profile.save()
+
+@receiver(post_migrate)
+def create_subscription_plans(sender, **kwargs):
+    plans = [
+        {"name": "free", "max_particulars": 9999, "max_reminders_per_particular": 2, "allow_recurring": False},
+        {"name": "premium", "max_particulars": 20, "max_reminders_per_particular": 10, "allow_recurring": True},
+        {"name": "enterprise", "max_particulars": 9999, "max_reminders_per_particular": 9999, "allow_recurring": True},
+    ]
+    for plan in plans:
+        SubscriptionPlan.objects.get_or_create(name=plan["name"], defaults=plan)
