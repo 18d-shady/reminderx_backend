@@ -157,3 +157,7 @@ MEDIA_ROOT = BASE_DIR / 'media'
 #so project in projects/reminderx/env
 #but you dont need this if you login as user reminderx_user
 #https://www.youtube.com/watch?v=Td3lirXIeRI
+# to edit vnv files on the server do vi .env then press i then when done press esc and :wq 
+#cat .env to view the files or cat to view the files in any folder
+
+#https://www.youtube.com/watch?v=SSLhGanxmCg for frontend

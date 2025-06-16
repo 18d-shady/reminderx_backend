@@ -143,7 +143,7 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",  # For Next.js dev
+    "http://localhost:3000", "http://naikas.com" # For Next.js dev
 ]
 
 REST_FRAMEWORK = {
