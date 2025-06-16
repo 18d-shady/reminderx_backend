@@ -161,3 +161,29 @@ MEDIA_ROOT = BASE_DIR / 'media'
 #cat .env to view the files or cat to view the files in any folder
 
 #https://www.youtube.com/watch?v=SSLhGanxmCg for frontend
+"""
+# Create 1GB swap file
+sudo fallocate -l 1G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+
+# Verify it's working
+free -h
+
+sudo swapoff /swapfile
+sudo rm /swapfile
+
+pm2 list
+
+# View logs
+pm2 logs reminderx-frontend
+
+# Restart if needed
+pm2 restart reminderx-frontend
+
+# Stop the app
+pm2 stop reminderx-frontend
+"""
+
+#pm2 start npm --name "reminderx-frontend" -- start
