@@ -83,6 +83,7 @@ class Reminder(models.Model):
         ('email', 'Email'),
         ('sms', 'SMS'),
         ('push', 'Push Notification'),
+        ('whatsapp', 'WhatsApp'),
     ]
     RECURRENCE_CHOICES = [
         ('none', 'None'),
