@@ -217,6 +217,7 @@ crontab -e
 choose nano if prompted
 paste this line
 */10 * * * * /projects/reminderx/env/bin/python /projects/reminderx/reminderx_backend/manage.py generate_notifications --settings=reminderx_backend.settingsprod >> /projects/reminderx/cron.log 2>&1
+*/10 * * * * /projects/reminderx/env/bin/python /projects/reminderx/reminderx_backend/manage.py send_notifications --settings=reminderx_backend.settingsprod >> /projects/reminderx/cron.log 2>&1
 to check
 tail -f /projects/reminderx/cron.log 
 """
