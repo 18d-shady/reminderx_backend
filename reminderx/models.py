@@ -2,6 +2,8 @@ import os
 from django.db import models
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
+from django.utils import timezone
+from datetime import timedelta
 
 def user_directory_path(instance, filename):
     # If this is a profile picture
@@ -40,6 +42,9 @@ class Profile(models.Model):
     reminder_time = models.IntegerField(default=3)
     subscription_plan = models.ForeignKey(SubscriptionPlan, on_delete=models.SET_NULL, null=True)
     profile_picture = models.ImageField(upload_to=user_directory_path, null=True, blank=True)
+    fcm_web_token = models.CharField(max_length=255, blank=True, null=True)
+    fcm_android_token = models.CharField(max_length=255, blank=True, null=True)
+    fcm_ios_token = models.CharField(max_length=255, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -124,6 +129,17 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"Notification for {self.user.username} - {self.particular_title}"
+    
+
+class EmailVerification(models.Model):
+    email = models.EmailField()
+    otp = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def is_expired(self):
+        return timezone.now() > self.created_at + timedelta(minutes=10)
+    
+
 
 def get_allowed_methods(profile: Profile):
     return [

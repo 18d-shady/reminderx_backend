@@ -4,6 +4,10 @@ from django.contrib.auth.models import User
 from .models import Profile, SubscriptionPlan
 from django.db.utils import OperationalError, ProgrammingError
 from django.db import connection
+from django_rest_passwordreset.signals import reset_password_token_created
+from django.core.mail import send_mail
+from django.conf import settings
+
 
 @receiver(post_save, sender=User)
 def create_or_update_user_profile(sender, instance, created, **kwargs):
@@ -47,3 +51,14 @@ def create_subscription_plans(sender, **kwargs):
             SubscriptionPlan.objects.get_or_create(name=plan["name"], defaults=plan)
         except Exception:
             pass
+
+
+@receiver(reset_password_token_created)
+def password_reset_token_created(sender, instance, reset_password_token, *args, **kwargs):
+    send_mail(
+        subject="Password Reset for Naikas",
+        message=f"Use this token to reset your password: {reset_password_token.key}",
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[reset_password_token.user.email],
+    )
+

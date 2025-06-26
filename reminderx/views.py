@@ -1,5 +1,6 @@
 from django.shortcuts import render
 
+import random
 from rest_framework import generics, permissions, status
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework.views import APIView
@@ -7,19 +8,25 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.generics import RetrieveUpdateAPIView
+from django.core.mail import send_mail
 from .permissions import CanCreateParticular, CanCreateReminder
-from .models import Particular, Reminder, Notification, get_allowed_methods
+from .models import Particular, Reminder, Notification, get_allowed_methods, EmailVerification
 from .serializers import (
     ParticularSerializer,
     ReminderSerializer,
     RegisterSerializer,
     ProfileSerializer,
     NotificationSerializer,
+    CustomTokenObtainPairSerializer,
 )
 from django.contrib.auth.models import User
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.exceptions import ValidationError
+from django.conf import settings
 
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer
 
 @api_view(['GET', 'PUT', 'PATCH', 'DELETE'])
 @permission_classes([IsAuthenticated])
@@ -128,11 +135,21 @@ class NotificationListView(generics.ListAPIView):
 # Register new user and return JWT tokens
 class RegisterView(APIView):
     def post(self, request):
+        otp = request.data.get("otp")
+        email = request.data.get("email")
+        # Require OTP for registration
+        if not otp or not email:
+            return Response({"error": "OTP and email are required for registration."}, status=400)
+        record = EmailVerification.objects.filter(email=email, otp=otp).last()
+        if not record or record.is_expired():
+            return Response({"error": "Invalid or expired OTP. Please verify your email first."}, status=400)
         serializer = RegisterSerializer(data=request.data)
         if serializer.is_valid():
             try:
                 user = serializer.save()
                 refresh = RefreshToken.for_user(user)
+                # Clean up OTP record after successful registration
+                record.delete()
                 return Response({
                     "refresh": str(refresh),
                     "access": str(refresh.access_token),
@@ -142,8 +159,58 @@ class RegisterView(APIView):
                     "error": "Failed to create user",
                     "detail": str(e)
                 }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
         return Response({
             "error": "Validation failed",
             "details": serializer.errors
         }, status=status.HTTP_400_BAD_REQUEST)
+
+class SendVerificationEmail(APIView):
+    def post(self, request):
+        email = request.data.get("email")
+        username = request.data.get("username")
+        if not email:
+            return Response({"error": "Email is required"}, status=400)
+        if not username:
+            return Response({"error": "Username is required"}, status=400)
+
+        if User.objects.filter(email=email).exists():
+            return Response({"error": "Email already in use."}, status=400)
+        if User.objects.filter(username=username).exists():
+            return Response({"error": "Username already taken."}, status=400)
+
+        otp = str(random.randint(100000, 999999))
+        EmailVerification.objects.create(email=email, otp=otp)
+
+        send_mail(
+            subject="Naikas OTP Code",
+            message=f"Your OTP code is {otp}",
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[email],
+            fail_silently=False,
+        )
+
+        return Response({"message": "OTP sent"}, status=200)
+
+class RegisterFCMTokenView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        token = request.data.get("token")
+        platform = request.data.get("platform")  # 'web', 'android', 'ios'
+
+        if not token or not platform:
+            return Response({"error": "Token and platform are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        profile = request.user.profile
+
+        if platform == "web":
+            profile.fcm_web_token = token
+        elif platform == "android":
+            profile.fcm_android_token = token
+        elif platform == "ios":
+            profile.fcm_ios_token = token
+        else:
+            return Response({"error": "Invalid platform."}, status=status.HTTP_400_BAD_REQUEST)
+
+        profile.save()
+        return Response({"message": "Token saved successfully."})

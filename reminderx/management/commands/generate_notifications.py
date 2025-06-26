@@ -38,7 +38,7 @@ class Command(BaseCommand):
                 continue  # Skip if no usable methods
 
             # Use custom message if provided, otherwise use default
-            message = reminder.reminder_message or f"Reminder: {reminder.particular.title} is due on {reminder.particular.expiry_date}. Please update it."
+            message = reminder.reminder_message or f"Reminder: {reminder.particular.title} is due on {reminder.particular.expiry_date}. Please renew it."
 
             Notification.objects.create(
                 user=user,

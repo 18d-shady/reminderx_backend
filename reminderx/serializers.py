@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import Particular, Reminder, Profile, Notification
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -80,3 +81,22 @@ class RegisterSerializer(serializers.ModelSerializer):
             password=validated_data["password"]
         )
         return user
+
+
+#adding this for login with both username and email
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    def validate(self, attrs):
+        login = attrs.get("username")
+        password = attrs.get("password")
+
+        user = User.objects.filter(username=login).first()
+        if user is None:
+            user = User.objects.filter(email=login).first()
+
+        if user is None or not user.check_password(password):
+            raise serializers.ValidationError("Invalid credentials")
+
+        attrs['username'] = user.username  # Ensure correct username is passed
+        data = super().validate(attrs)
+
+        return data

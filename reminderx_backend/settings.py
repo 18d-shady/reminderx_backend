@@ -10,7 +10,12 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
+import os
+
 from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -41,6 +46,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django_rest_passwordreset',
 ]
 
 MIDDLEWARE = [
@@ -138,10 +144,12 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-
+"""
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # For Next.js dev
 ]
+"""
+CORS_ALLOW_ALL_ORIGINS = True
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
@@ -151,6 +159,16 @@ REST_FRAMEWORK = {
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# For development
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = "smtp.hostinger.com"
+EMAIL_PORT = 465
+EMAIL_USE_SSL = True
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
 
 #projects/reminderx/
 #new user reminderx_user
@@ -188,3 +206,18 @@ pm2 stop reminderx-frontend
 """
 
 #pm2 start npm --name "reminderx-frontend" -- start
+#python manage.py runserver --settings=reminderx_backend.settingsprod
+#supervisorctl restart reminderx
+#cd /etc/nginx/sites-enabled
+#service nginx restart
+#--- crontab for django --
+"""
+su - reminderx_user or crontab -u reminderx_user -e to do it from the root user without login in
+crontab -e
+choose nano if prompted
+paste this line
+*/10 * * * * /projects/reminderx/env/bin/python /projects/reminderx/reminderx_backend/manage.py generate_notifications --settings=reminderx_backend.settingsprod >> /projects/reminderx/cron.log 2>&1
+to check
+tail -f /projects/reminderx/cron.log 
+"""
+

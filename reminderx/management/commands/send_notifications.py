@@ -5,12 +5,18 @@ from twilio.rest import Client
 from django.core.mail import send_mail
 from django.core.management.base import BaseCommand
 from reminderx.models import Notification, Profile
+import json
+
 
 # Firebase init
-cred_path = os.path.join(os.path.dirname(__file__), '../../../firebase_credentials.json')
-if not firebase_admin._apps:
-    cred = credentials.Certificate(cred_path)
-    firebase_admin.initialize_app(cred)
+FIREBASE_CREDENTIALS_JSON = os.getenv("FIREBASE_CREDENTIALS_JSON")
+
+if FIREBASE_CREDENTIALS_JSON:
+    cred_dict = json.loads(FIREBASE_CREDENTIALS_JSON)
+    #cred_path = os.path.join(os.path.dirname(__file__), "C:\Users\D.F.O COMPUTERS\Documents\Project 2025\ReminderX\naikas-4b46c-firebase-adminsdk-fbsvc-70437c4696.json")
+    if not firebase_admin._apps:
+        cred = credentials.Certificate(cred_dict)
+        firebase_admin.initialize_app(cred)
 
 # Twilio init
 TWILIO_ACCOUNT_SID = os.environ.get("TWILIO_ACCOUNT_SID")
@@ -29,7 +35,7 @@ class Command(BaseCommand):
         from sendgrid import SendGridAPIClient
         from sendgrid.helpers.mail import Mail
 
-        notifications = Notification.objects.filter(sent=False)
+        notifications = Notification.objects.filter(is_sent=False)
 
         for n in notifications:
             profile = Profile.objects.get(user=n.user)
@@ -40,7 +46,7 @@ class Command(BaseCommand):
                 try:
                     if USE_SENDGRID:
                         sg_message = Mail(
-                            from_email='noreply@reminderx.com',
+                            from_email='support@naikas.com',
                             to_emails=n.user.email,
                             subject=f"Reminder: {n.particular_title}",
                             plain_text_content=n.message,
@@ -53,7 +59,7 @@ class Command(BaseCommand):
                         send_mail(
                             subject=f"Reminder: {n.particular_title}",
                             message=n.message,
-                            from_email='noreply@reminderx.com',
+                            from_email='support@naikas.com',
                             recipient_list=[n.user.email],
                             fail_silently=False,
                         )
@@ -90,22 +96,31 @@ class Command(BaseCommand):
 
             # Push Notification
             if n.send_push:
-                try:
-                    fcm_token = getattr(profile, "fcm_token", None)
-                    if fcm_token:
-                        messaging.send(messaging.Message(
-                            token=fcm_token,
-                            notification=messaging.Notification(
-                                title="ReminderX",
-                                body=n.message,
-                            )
-                        ))
-                        self.stdout.write(f"✅ Push notification sent to {n.user.username}")
-                except Exception as e:
-                    self.stdout.write(f"❌ Push failed: {e}")
-                    all_success = False
+                tokens = [
+                    profile.fcm_web_token,
+                    profile.fcm_android_token,
+                    profile.fcm_ios_token,
+                ]
+                sent_any = False
+                for token in tokens:
+                    if token:
+                        try:
+                            messaging.send(messaging.Message(
+                                token=token,
+                                notification=messaging.Notification(
+                                    title="Naikas",
+                                    body=n.message,
+                                )
+                            ))
+                            self.stdout.write(f"✅ Push notification sent to {n.user.username} (token: {token[:10]}...)")
+                            sent_any = True
+                        except Exception as e:
+                            self.stdout.write(f"❌ Push failed for token {token[:10]}...: {e}")
+                            all_success = False
+                if not sent_any:
+                    self.stdout.write(f"❌ No FCM tokens found for {n.user.username}")
 
             # Mark as sent
             if all_success:
-                n.sent = True
+                n.is_sent = True
                 n.save()

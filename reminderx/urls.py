@@ -3,9 +3,15 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from .views import *
 
 urlpatterns = [
+    #firebase
+    path('api/fcm-token/', RegisterFCMTokenView.as_view(), name='register-fcm-token'),
+
+    #register
     path('api/register/', RegisterView.as_view(), name='register'),
+    path('api/verify-email/', SendVerificationEmail.as_view(), name='verify_email'),
+
     # Auth
-    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/token/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 
     # Core APIs
