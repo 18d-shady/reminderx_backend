@@ -39,7 +39,7 @@ class Command(BaseCommand):
 
         for n in notifications:
             profile = Profile.objects.get(user=n.user)
-            all_success = True
+            any_success = False
 
             # Email
             if n.send_email and n.user.email:
@@ -64,9 +64,9 @@ class Command(BaseCommand):
                             fail_silently=False,
                         )
                         self.stdout.write(f"✅ Email sent to {n.user.email}")
+                    any_success = True
                 except Exception as e:
                     self.stdout.write(f"❌ Email failed: {e}")
-                    all_success = False
 
             # SMS
             if n.send_sms and profile.phone_number:
@@ -77,9 +77,9 @@ class Command(BaseCommand):
                         to=profile.phone_number
                     )
                     self.stdout.write(f"✅ SMS sent to {profile.phone_number}")
+                    any_success = True
                 except Exception as e:
                     self.stdout.write(f"❌ SMS failed: {e}")
-                    all_success = False
 
             # WhatsApp
             if n.send_whatsapp and profile.phone_number:
@@ -90,9 +90,9 @@ class Command(BaseCommand):
                         to='whatsapp:' + profile.phone_number
                     )
                     self.stdout.write(f"✅ WhatsApp sent to {profile.phone_number}")
+                    any_success = True
                 except Exception as e:
                     self.stdout.write(f"❌ WhatsApp failed: {e}")
-                    all_success = False
 
             # Push Notification
             if n.send_push:
@@ -114,13 +114,13 @@ class Command(BaseCommand):
                             ))
                             self.stdout.write(f"✅ Push notification sent to {n.user.username} (token: {token[:10]}...)")
                             sent_any = True
+                            any_success = True
                         except Exception as e:
                             self.stdout.write(f"❌ Push failed for token {token[:10]}...: {e}")
-                            all_success = False
                 if not sent_any:
                     self.stdout.write(f"❌ No FCM tokens found for {n.user.username}")
 
-            # Mark as sent
-            if all_success:
+            # Mark as sent if any channel succeeded
+            if any_success:
                 n.is_sent = True
                 n.save()
