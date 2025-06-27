@@ -1,5 +1,5 @@
 from django.shortcuts import render
-
+import requests
 import random
 from rest_framework import generics, permissions, status
 from rest_framework_simplejwt.views import TokenObtainPairView
@@ -23,6 +23,7 @@ from django.contrib.auth.models import User
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.exceptions import ValidationError
 from django.conf import settings
+import os
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -180,7 +181,7 @@ class SendVerificationEmail(APIView):
 
         otp = str(random.randint(100000, 999999))
         EmailVerification.objects.create(email=email, otp=otp)
-
+        """
         send_mail(
             subject="Naikas OTP Code",
             message=f"Your OTP code is {otp}",
@@ -188,6 +189,16 @@ class SendVerificationEmail(APIView):
             recipient_list=[email],
             fail_silently=False,
         )
+        """
+        requests.post(
+            "https://api.mailgun.net/v3/sandbox231cedf569554685886fed3865190351.mailgun.org/messages",
+            auth=("api", os.environ.get('MAILGUN_API')),
+            data={"from": "Mailgun Sandbox <postmaster@sandbox231cedf569554685886fed3865190351.mailgun.org>",
+                "to": [email],
+                "subject": "Naikas OTP Code",
+                "text": f"Your OTP code is {otp}"}
+        )
+        
 
         return Response({"message": "OTP sent"}, status=200)
 

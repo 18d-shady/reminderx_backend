@@ -6,6 +6,7 @@ from django.core.mail import send_mail
 from django.core.management.base import BaseCommand
 from reminderx.models import Notification, Profile
 import json
+import requests
 
 
 # Firebase init
@@ -56,12 +57,21 @@ class Command(BaseCommand):
                         response = sg.send(sg_message)
                         self.stdout.write(f"✅ SendGrid email sent to {n.user.email} (status: {response.status_code})")
                     else:
+                        """
                         send_mail(
                             subject=f"Reminder: {n.particular_title}",
                             message=n.message,
                             from_email='support@naikas.com',
                             recipient_list=[n.user.email],
                             fail_silently=False,
+                        )"""
+                        requests.post(
+                            "https://api.mailgun.net/v3/sandbox231cedf569554685886fed3865190351.mailgun.org/messages",
+                            auth=("api", os.environ.get('MAILGUN_API')),
+                            data={"from": "Mailgun Sandbox <postmaster@sandbox231cedf569554685886fed3865190351.mailgun.org>",
+                                "to": [n.user.email],
+                                "subject": f"Reminder: {n.particular_title}",
+                                "text": n.message}
                         )
                         self.stdout.write(f"✅ Email sent to {n.user.email}")
                     any_success = True

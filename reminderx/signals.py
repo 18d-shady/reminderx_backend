@@ -7,6 +7,8 @@ from django.db import connection
 from django_rest_passwordreset.signals import reset_password_token_created
 from django.core.mail import send_mail
 from django.conf import settings
+import os
+import requests
 
 
 @receiver(post_save, sender=User)
@@ -55,10 +57,23 @@ def create_subscription_plans(sender, **kwargs):
 
 @receiver(reset_password_token_created)
 def password_reset_token_created(sender, instance, reset_password_token, *args, **kwargs):
+    requests.post(
+  		"https://api.mailgun.net/v3/sandbox231cedf569554685886fed3865190351.mailgun.org/messages",
+  		auth=("api", os.environ.get('MAILGUN_API')),
+  		data={"from": "Mailgun Sandbox <postmaster@sandbox231cedf569554685886fed3865190351.mailgun.org>",
+			"to": [reset_password_token.user.email],
+  			"subject": "Password Reset for Naikas",
+  			"text": f"Use this token to reset your password: {reset_password_token.key}"}
+    )
+    """
     send_mail(
         subject="Password Reset for Naikas",
         message=f"Use this token to reset your password: {reset_password_token.key}",
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[reset_password_token.user.email],
     )
+    """
+    
+def send_simple_message():
+  	return 
 
