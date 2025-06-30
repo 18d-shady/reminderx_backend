@@ -58,9 +58,9 @@ def create_subscription_plans(sender, **kwargs):
 @receiver(reset_password_token_created)
 def password_reset_token_created(sender, instance, reset_password_token, *args, **kwargs):
     requests.post(
-  		"https://api.mailgun.net/v3/sandbox231cedf569554685886fed3865190351.mailgun.org/messages",
-  		auth=("api", os.environ.get('MAILGUN_API')),
-  		data={"from": "Mailgun Sandbox <postmaster@sandbox231cedf569554685886fed3865190351.mailgun.org>",
+  		"https://api.mailgun.net/v3/naikas.com/messages",
+        auth=("api", os.environ.get('MAILGUN_API')),
+        data={"from": "Naikas <postmaster@naikas.com>",
 			"to": [reset_password_token.user.email],
   			"subject": "Password Reset for Naikas",
   			"text": f"Use this token to reset your password: {reset_password_token.key}"}

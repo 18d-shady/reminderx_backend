@@ -66,9 +66,9 @@ class Command(BaseCommand):
                             fail_silently=False,
                         )"""
                         requests.post(
-                            "https://api.mailgun.net/v3/sandbox231cedf569554685886fed3865190351.mailgun.org/messages",
+                            "https://api.mailgun.net/v3/naikas.com/messages",
                             auth=("api", os.environ.get('MAILGUN_API')),
-                            data={"from": "Mailgun Sandbox <postmaster@sandbox231cedf569554685886fed3865190351.mailgun.org>",
+                            data={"from": "Naikas <postmaster@naikas.com>",
                                 "to": [n.user.email],
                                 "subject": f"Reminder: {n.particular_title}",
                                 "text": n.message}
