@@ -222,15 +222,3 @@ to check
 tail -f /projects/reminderx/cron.log 
 """
 
-"""
-import os
-import requests
-def send_simple_message():
-  	return requests.post(
-  		"https://api.mailgun.net/v3/naikas.com/messages",
-        auth=("api", os.environ.get('MAILGUN_API')),
-        data={"from": "Naikas <postmaster@naikas.com>",
-			"to": "Chuks <support@naikas.com>",
-  			"subject": "Hello Chuks",
-  			"text": "Congratulations Chuks, you just sent an email with Mailgun! You are truly awesome!"})
-"""
