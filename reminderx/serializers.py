@@ -2,6 +2,9 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import Particular, Reminder, Profile, Notification
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from PIL import Image
+from io import BytesIO
+from django.core.files.base import ContentFile
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -23,6 +26,32 @@ class ProfileSerializer(serializers.ModelSerializer):
         if obj.profile_picture and request:
             return request.build_absolute_uri(obj.profile_picture.url)
         return None
+
+    # def resize_image(self, image_field):
+    #     image = Image.open(image_field)
+    #     if image.width > 512:
+    #         ratio = 512 / float(image.width)
+    #         height = int((float(image.height) * float(ratio)))
+    #         image = image.resize((512, height), Image.LANCZOS)
+    #         buffer = BytesIO()
+    #         image_format = image_field.name.split('.')[-1].upper()
+    #         if image_format == 'JPG':
+    #             image_format = 'JPEG'
+    #         image.save(buffer, format=image_format)
+    #         return ContentFile(buffer.getvalue(), name=image_field.name)
+    #     return image_field
+
+    def update(self, instance, validated_data):
+        profile_picture = validated_data.get('profile_picture', None)
+        # if profile_picture:
+        #     validated_data['profile_picture'] = self.resize_image(profile_picture)
+        return super().update(instance, validated_data)
+
+    def create(self, validated_data):
+        profile_picture = validated_data.get('profile_picture', None)
+        # if profile_picture:
+        #     validated_data['profile_picture'] = self.resize_image(profile_picture)
+        return super().create(validated_data)
 
 
 class ReminderSerializer(serializers.ModelSerializer):

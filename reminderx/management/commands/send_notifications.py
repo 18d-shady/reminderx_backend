@@ -25,9 +25,7 @@ TWILIO_AUTH_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN")
 TWILIO_PHONE_NUMBER = os.environ.get("TWILIO_PHONE_NUMBER")
 client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
 
-# SendGrid setup (optional)
-SENDGRID_API_KEY = os.environ.get('SENDGRID_API_KEY')
-USE_SENDGRID = bool(SENDGRID_API_KEY)
+MAILGUN_API = os.environ.get("MAILGUN_API")
 
 class Command(BaseCommand):
     help = "Send unsent notifications"
@@ -45,35 +43,15 @@ class Command(BaseCommand):
             # Email
             if n.send_email and n.user.email:
                 try:
-                    if USE_SENDGRID:
-                        sg_message = Mail(
-                            from_email='support@naikas.com',
-                            to_emails=n.user.email,
-                            subject=f"Reminder: {n.particular_title}",
-                            plain_text_content=n.message,
-                            html_content=f"<p>{n.message}</p>",
-                        )
-                        sg = SendGridAPIClient(SENDGRID_API_KEY)
-                        response = sg.send(sg_message)
-                        self.stdout.write(f"✅ SendGrid email sent to {n.user.email} (status: {response.status_code})")
-                    else:
-                        """
-                        send_mail(
-                            subject=f"Reminder: {n.particular_title}",
-                            message=n.message,
-                            from_email='support@naikas.com',
-                            recipient_list=[n.user.email],
-                            fail_silently=False,
-                        )"""
-                        requests.post(
-                            "https://api.mailgun.net/v3/naikas.com/messages",
-                            auth=("api", os.environ.get('MAILGUN_API')),
-                            data={"from": "Naikas <postmaster@naikas.com>",
-                                "to": [n.user.email],
-                                "subject": f"Reminder: {n.particular_title}",
-                                "text": n.message}
-                        )
-                        self.stdout.write(f"✅ Email sent to {n.user.email}")
+                    requests.post(
+                        "https://api.mailgun.net/v3/naikas.com/messages",
+                        auth=("api", MAILGUN_API),
+                        data={"from": "Naikas <postmaster@naikas.com>",
+                            "to": [n.user.email],
+                            "subject": f"Reminder: {n.particular_title}",
+                            "text": n.message}
+                    )
+                    self.stdout.write(f"✅ Email sent to {n.user.email}")
                     any_success = True
                 except Exception as e:
                     self.stdout.write(f"❌ Email failed: {e}")
