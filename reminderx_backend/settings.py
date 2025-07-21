@@ -224,5 +224,10 @@ paste this line
 */10 * * * * /projects/reminderx/env/bin/python /projects/reminderx/reminderx_backend/manage.py send_notifications --settings=reminderx_backend.settingsprod >> /projects/reminderx/cron.log 2>&1
 to check
 tail -f /projects/reminderx/cron.log 
+more, less, tail, cat
+keytstore password naikas name naikas_key
+Is CN=Enyinnaya Omeruah, OU=Technology Department, O=Virtual Concept Technologies, L=Abuja, ST=FCT, C=NG correct?
+flutter build appbundle --release
+flutter build apk --release
 """
 
