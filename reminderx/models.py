@@ -4,6 +4,7 @@ from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.utils import timezone
 from datetime import timedelta
+import random
 
 def user_directory_path(instance, filename):
     # If this is a profile picture
@@ -16,21 +17,46 @@ def user_directory_path(instance, filename):
     safe_title = instance.title.replace(" ", "_").lower()
     return f'user_{instance.user.id}/{safe_title}.{ext}'
 
+def get_free_plan():
+    try:
+        return SubscriptionPlan.objects.get(name="free").id
+    except SubscriptionPlan.DoesNotExist:
+        return None
+
 
 class SubscriptionPlan(models.Model):
     PLAN_CHOICES = [
         ('free', 'Free'),
         ('premium', 'Premium'),
         ('enterprise', 'Enterprise'),
+        ('multiusers', 'Multiusers'),
     ]
     
     name = models.CharField(max_length=20, choices=PLAN_CHOICES, unique=True)
     max_particulars = models.IntegerField()
     max_reminders_per_particular = models.IntegerField()
+    allows_multi_user = models.BooleanField(default=False) 
     allow_recurring = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name
+    
+class Organization(models.Model):
+    organizational_id = models.CharField(max_length=6, unique=True)  # 6-digit ID
+    name = models.CharField(max_length=255)
+    admin = models.ForeignKey(
+        'Profile',  # Admin profile
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='managed_organization'
+    )
+    icon_url = models.URLField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.organizational_id})"
 
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
@@ -40,7 +66,7 @@ class Profile(models.Model):
     push_notifications = models.BooleanField(default=True)
     whatsapp_notifications = models.BooleanField(default=False)
     reminder_time = models.IntegerField(default=3)
-    subscription_plan = models.ForeignKey(SubscriptionPlan, on_delete=models.SET_NULL, null=True)
+    subscription_plan = models.ForeignKey(SubscriptionPlan, on_delete=models.SET_NULL, null=True, default=get_free_plan)
     profile_picture = models.ImageField(upload_to=user_directory_path, null=True, blank=True)
     fcm_web_token = models.CharField(max_length=255, blank=True, null=True)
     fcm_android_token = models.CharField(max_length=255, blank=True, null=True)
@@ -48,8 +74,34 @@ class Profile(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="members"
+    )
+
+    role = models.CharField(
+        max_length=20,
+        choices=[("admin", "Admin"), ("staff", "Staff"), ("unverified", "Unverified"), ("manager", "Manager")],
+        default="admin"
+    )
+
+    def save(self, *args, **kwargs):
+        # 🔒 Restrict free plan to push notifications only
+        if self.subscription_plan and self.subscription_plan.name == "free":
+            self.email_notifications = False
+            self.sms_notifications = False
+            self.whatsapp_notifications = False
+            self.push_notifications = True
+        super().save(*args, **kwargs)
+
+
     def __str__(self):
         return f"Profile for {self.user.username}"
+    
+
 
 
 class Particular(models.Model):
@@ -150,6 +202,7 @@ def get_allowed_methods(profile: Profile):
             'whatsapp': profile.whatsapp_notifications,
         }.items() if enabled
     ]
+
 
 """
 Vehicle	

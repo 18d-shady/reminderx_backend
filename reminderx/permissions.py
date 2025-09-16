@@ -2,6 +2,31 @@ from rest_framework import permissions
 from .models import Particular, Reminder
 from rest_framework.exceptions import PermissionDenied
 
+
+class CanCreateParticular(permissions.BasePermission):
+    def has_permission(self, request, view):
+        if request.method not in permissions.SAFE_METHODS:  # Only POST, PUT, etc.
+            user = request.user
+            profile = user.profile
+            max_allowed = profile.subscription_plan.max_particulars
+
+            # No plan assigned
+            if max_allowed is None:
+                return True  # Unlimited
+
+            # Sentinel -1 also means unlimited
+            if max_allowed == -1:
+                return True
+
+            current_count = user.particulars.count()
+            if current_count >= max_allowed:
+                raise PermissionDenied(
+                    f"You have reached your plan's limit of {max_allowed} particulars."
+                )
+            return True
+        return True  # Allow safe methods like GET
+
+"""
 class CanCreateParticular(permissions.BasePermission):
     def has_permission(self, request, view):
         if request.method not in permissions.SAFE_METHODS:  # Only apply on POST, PUT, etc.
@@ -13,7 +38,7 @@ class CanCreateParticular(permissions.BasePermission):
             current_count = user.particulars.count()
             return current_count < max_allowed
         return True  # Allow safe methods like GET
-
+"""
 
 class CanCreateReminder(permissions.BasePermission):
     def has_permission(self, request, view):

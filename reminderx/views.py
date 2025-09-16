@@ -10,20 +10,25 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.generics import RetrieveUpdateAPIView
 from django.core.mail import send_mail
 from .permissions import CanCreateParticular, CanCreateReminder
-from .models import Particular, Reminder, Notification, get_allowed_methods, EmailVerification
+from .models import Organization, Particular, Reminder, Notification, get_allowed_methods, EmailVerification, SubscriptionPlan, Profile
 from .serializers import (
+    OrganizationDetailSerializer,
     ParticularSerializer,
     ReminderSerializer,
     RegisterSerializer,
     ProfileSerializer,
     NotificationSerializer,
     CustomTokenObtainPairSerializer,
+    BulkParticularListSerializer,
+    OrganizationCreateSerializer
 )
 from django.contrib.auth.models import User
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.exceptions import ValidationError
 from django.conf import settings
 import os
+from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
+from django.shortcuts import get_object_or_404
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -225,3 +230,121 @@ class RegisterFCMTokenView(APIView):
 
         profile.save()
         return Response({"message": "Token saved successfully."})
+
+
+class BulkParticularCreateView(APIView):
+    def post(self, request, *args, **kwargs):
+        serializer = BulkParticularListSerializer(data=request.data, context={"request": request})
+        if serializer.is_valid():
+            created_docs = serializer.save()
+            return Response(
+                {
+                    "message": f"{len(created_docs)} documents (with reminders) created successfully.",
+                    "particulars": [p.id for p in created_docs]
+                },
+                status=status.HTTP_201_CREATED
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    
+@api_view(["POST"])
+def manual_upgrade(request):
+    plan_name = request.data.get("plan")
+    if not plan_name:
+        return Response({"error": "plan is required"}, status=400)
+
+    try:
+        plan = SubscriptionPlan.objects.get(name=plan_name)
+    except SubscriptionPlan.DoesNotExist:
+        return Response({"error": f"Plan '{plan_name}' does not exist"}, status=404)
+
+    profile = request.user.profile
+    profile.subscription_plan = plan
+    profile.save()
+
+    return Response({"status": "success", "new_plan": plan.name})
+
+class CreateOrganizationView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = OrganizationCreateSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            organization = serializer.save()
+            return Response({
+                "id": organization.id,
+                "organizational_id": organization.organizational_id,
+                "name": organization.name
+            }, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+class VerifyOrganizationView(APIView):
+    """
+    Simple endpoint to verify if an organization exists by organizational_id.
+    """
+    def get(self, request, *args, **kwargs):
+        org_id = request.query_params.get("org_id")
+
+        if not org_id:
+            return Response({"detail": "organizational_id is required."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            org = Organization.objects.get(organizational_id=org_id)
+            return Response({
+                "exists": True,
+                "id": org.id,
+                "name": org.name,
+                "organizational_id": org.organizational_id,
+                "admin": {
+                    "id": org.admin.id,
+                    "username": org.admin.user.username,
+                    "email": org.admin.user.email,
+                }
+            }, status=status.HTTP_200_OK)
+
+        except Organization.DoesNotExist:
+            return Response({"exists": False}, status=status.HTTP_404_NOT_FOUND)
+
+
+class VerifyStaffView(APIView):
+    permission_classes = [IsAuthenticated]  # Admin must be logged in
+
+    def post(self, request):
+        token = request.data.get("token")
+        if not token:
+            return Response({"error": "Token is required."}, status=400)
+
+        signer = TimestampSigner()
+        try:
+            profile_id = signer.unsign(token, max_age=60*60*24)  # 24h expiry
+        except SignatureExpired:
+            return Response({"error": "Verification link expired."}, status=400)
+        except BadSignature:
+            return Response({"error": "Invalid verification token."}, status=400)
+
+        staff_profile = get_object_or_404(Profile, id=profile_id)
+
+        # ✅ Ensure staff has an organization
+        if not staff_profile.organization:
+            return Response({"error": "This staff is not linked to any organization."}, status=400)
+
+        # ✅ Ensure staff org matches admin org
+        if staff_profile.organization != request.user.profile.organization:
+            return Response({"error": "Staff does not belong to your organization."}, status=403)
+
+        # ✅ Ensure the logged-in user is the admin of that org
+        if staff_profile.organization.admin != request.user.profile:
+            return Response({"error": "You are not authorized to verify this staff."}, status=403)
+
+        # Approve staff
+        staff_profile.role = "staff"
+        staff_profile.save()
+
+        return Response({"message": f"{staff_profile.user.username} has been verified."}, status=200)
+
+
+class OrganizationDetailView(generics.RetrieveAPIView):
+    queryset = Organization.objects.all()
+    serializer_class = OrganizationDetailSerializer
+    lookup_field = "organizational_id"

@@ -1,7 +1,7 @@
 from django.db.models.signals import post_save, post_migrate
 from django.dispatch import receiver
 from django.contrib.auth.models import User
-from .models import Profile, SubscriptionPlan
+from .models import Profile, SubscriptionPlan, Organization
 from django.db.utils import OperationalError, ProgrammingError
 from django.db import connection
 from django_rest_passwordreset.signals import reset_password_token_created
@@ -44,9 +44,10 @@ def create_subscription_plans(sender, **kwargs):
         return
 
     plans = [
-        {"name": "free", "max_particulars": 9999, "max_reminders_per_particular": 9999, "allow_recurring": True},
-        {"name": "premium", "max_particulars": 9999, "max_reminders_per_particular": 9999, "allow_recurring": True},
-        {"name": "enterprise", "max_particulars": 9999, "max_reminders_per_particular": 9999, "allow_recurring": True},
+        {"name": "free", "max_particulars": 5, "max_reminders_per_particular": 9999, "allow_recurring": True},
+        {"name": "premium", "max_particulars": -1, "max_reminders_per_particular": 9999, "allow_recurring": True},
+        {"name": "enterprise", "max_particulars": -1, "max_reminders_per_particular": 9999, "allow_recurring": True},
+        {"name": "multiusers", "max_particulars": -1, "max_reminders_per_particular": 9999, "allow_recurring": True, "allows_multi_user": True},
     ]
     for plan in plans:
         try:
@@ -76,4 +77,34 @@ def password_reset_token_created(sender, instance, reset_password_token, *args, 
     
 def send_simple_message():
   	return 
+
+
+"""
+@receiver(post_save, sender=Profile)
+def create_organization_for_admin(sender, instance: Profile, created, **kwargs):
+    
+    #Automatically creates an Organization for multiuser admins if not already assigned.
+    # Check if user is multiuser and admin
+    if instance.subscription_plan and instance.subscription_plan.name == "multiusers" and instance.role == "admin":
+        if not instance.organization:
+            # Create a new organization
+            org = Organization.objects.create(
+                organizational_id=str(instance.id).zfill(6),  # 6-digit unique ID
+                name=f"{instance.user.username}'s Organization",
+                admin=instance
+            )
+            # Assign the organization to the profile
+            instance.organization = org
+            instance.save()
+            
+@receiver(post_save, sender=Profile)
+def delete_existing_organization(sender, instance: Profile, **kwargs):
+    
+    if instance.organization:
+        instance.organization.delete()
+        instance.organization = None
+        instance.save(update_fields=['organization'])
+"""
+
+
 
