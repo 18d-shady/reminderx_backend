@@ -21,7 +21,7 @@ class CanCreateParticular(permissions.BasePermission):
             current_count = user.particulars.count()
             if current_count >= max_allowed:
                 raise PermissionDenied(
-                    f"You have reached your plan's limit of {max_allowed} particulars."
+                    f"You have reached your plan's limit of {max_allowed} reminders."
                 )
             return True
         return True  # Allow safe methods like GET

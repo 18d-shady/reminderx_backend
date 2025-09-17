@@ -148,8 +148,8 @@ class RegisterSerializer(serializers.ModelSerializer):
             admin_email = org.admin.user.email
             signer = TimestampSigner()
             token = signer.sign(profile.id)
-            verification_link = f"http://localhost:3000/verify-staff/{token}/"
-            #verification_link = f"https://naikas.com/verify-staff/{token}/"
+            #verification_link = f"http://localhost:3000/verify-staff/{token}/"
+            verification_link = f"https://naikas.com/verify-staff/{token}/"
             # Send email to admin for verification
             requests.post(
                 "https://api.mailgun.net/v3/naikas.com/messages",

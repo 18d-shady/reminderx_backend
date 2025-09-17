@@ -177,6 +177,7 @@ DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 #projects/reminderx/
 #new user reminderx_user
 # virtual env name 'env'
+#source env/bin/activate
 #so project in projects/reminderx/env
 #but you dont need this if you login as user reminderx_user
 #https://www.youtube.com/watch?v=Td3lirXIeRI
@@ -210,7 +211,7 @@ pm2 stop reminderx-frontend
 """
 
 #pm2 start npm --name "reminderx-frontend" -- start
-#python manage.py runserver --settings=reminderx_backend.settingsprod
+#python manage.py makemigrations --settings=reminderx_backend.settingsprod
 #supervisorctl restart reminderx
 #cd /etc/nginx/sites-enabled
 #service nginx restart
