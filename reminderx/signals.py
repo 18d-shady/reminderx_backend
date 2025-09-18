@@ -1,7 +1,7 @@
 from django.db.models.signals import post_save, post_migrate
 from django.dispatch import receiver
 from django.contrib.auth.models import User
-from .models import Profile, SubscriptionPlan, Organization
+from .models import Particular, Profile, SubscriptionPlan, Organization
 from django.db.utils import OperationalError, ProgrammingError
 from django.db import connection
 from django_rest_passwordreset.signals import reset_password_token_created
@@ -74,7 +74,17 @@ def password_reset_token_created(sender, instance, reset_password_token, *args, 
         recipient_list=[reset_password_token.user.email],
     )
     """
-    
+
+@receiver(post_save, sender=Particular)
+def add_admin_as_owner(sender, instance, created, **kwargs):
+    if created:
+        profile = instance.user.profile
+        org = profile.organization
+        if org and profile.subscription_plan.name == "multiusers":
+            if org.admin:
+                instance.owners.add(org.admin)
+
+
 def send_simple_message():
   	return 
 

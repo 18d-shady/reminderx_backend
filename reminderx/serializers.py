@@ -17,6 +17,7 @@ class UserSerializer(serializers.ModelSerializer):
 
 class OrganizationSerializer(serializers.ModelSerializer):
     admin = serializers.SerializerMethodField()
+    icon_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Organization
@@ -29,6 +30,12 @@ class OrganizationSerializer(serializers.ModelSerializer):
                 "username": obj.admin.user.username,
                 "email": obj.admin.user.email,
             }
+        return None
+    
+    def get_icon_url(self, obj):
+        request = self.context.get('request')
+        if obj.icon and request:
+            return request.build_absolute_uri(obj.icon.url)
         return None
 
 
@@ -93,7 +100,7 @@ class ParticularSerializer(serializers.ModelSerializer):
     class Meta:
         model = Particular
         fields = '__all__'
-        read_only_fields = ['user', 'created_at', 'reminded']
+        read_only_fields = ['user', 'created_at']
 
     def get_document_url(self, obj):
         request = self.context.get('request')

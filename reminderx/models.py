@@ -40,7 +40,11 @@ class SubscriptionPlan(models.Model):
 
     def __str__(self):
         return self.name
-    
+
+def organization_icon_path(instance, filename):
+    ext = filename.split('.')[-1]
+    return f'organization_{instance.organizational_id}/icon.{ext}'
+
 class Organization(models.Model):
     organizational_id = models.CharField(max_length=6, unique=True)  # 6-digit ID
     name = models.CharField(max_length=255)
@@ -51,7 +55,7 @@ class Organization(models.Model):
         blank=True,
         related_name='managed_organization'
     )
-    icon_url = models.URLField(null=True, blank=True)
+    icon = models.ImageField(upload_to=organization_icon_path, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -125,7 +129,9 @@ class Particular(models.Model):
     category = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default='other')
     expiry_date = models.DateField(null=False)
     notes = models.TextField(blank=True)
-    reminded = models.BooleanField(default=False)
+    completed = models.BooleanField(default=False)
+    #for multi-user plans
+    owners = models.ManyToManyField("Profile", related_name="owned_particulars", blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

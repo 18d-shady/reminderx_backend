@@ -29,7 +29,14 @@ from django.conf import settings
 import os
 from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
 from django.shortcuts import get_object_or_404
+from django.db.models import Q
+from twilio.rest import Client
 
+
+TWILIO_ACCOUNT_SID = os.environ.get("TWILIO_ACCOUNT_SID")
+TWILIO_AUTH_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN")
+TWILIO_PHONE_NUMBER = os.environ.get("TWILIO_PHONE_NUMBER")
+client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
@@ -64,7 +71,11 @@ class ParticularListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticated & CanCreateParticular]
 
     def get_queryset(self):
-        return self.request.user.particulars.all()
+        #return self.request.user.particulars.all()
+        user = self.request.user
+        return Particular.objects.filter(
+            Q(user=user) | Q(owners=user.profile)  # include owner-linked particulars
+        ).distinct()
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
@@ -76,7 +87,10 @@ class ParticularDetailUpdateView(RetrieveUpdateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return Particular.objects.filter(user=self.request.user)
+        user = self.request.user
+        return Particular.objects.filter(
+            Q(user=user) | Q(owners=user.profile)
+        ).distinct()
 
     def delete(self, request, *args, **kwargs):
         particular = self.get_object()
@@ -91,11 +105,22 @@ class ParticularSearchView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
+        """
         user_particulars = self.request.user.particulars.all()
         search_query = self.request.query_params.get('q', None)
         if search_query:
             return user_particulars.filter(title__icontains=search_query)
         return user_particulars
+        """
+        user = self.request.user
+        queryset = Particular.objects.filter(
+            Q(user=user) | Q(owners=user.profile)
+        ).distinct()
+
+        search_query = self.request.query_params.get('q')
+        if search_query:
+            queryset = queryset.filter(title__icontains=search_query)
+        return queryset
 
 
 # Create or list reminders
@@ -104,11 +129,17 @@ class ReminderListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticated & CanCreateReminder]
 
     def get_queryset(self):
-        return Reminder.objects.filter(particular__user=self.request.user)
+        #return Reminder.objects.filter(particular__user=self.request.user)
+        user = self.request.user
+        return Reminder.objects.filter(
+            Q(particular__user=user) | Q(particular__owners=user.profile)
+        ).distinct()
 
     def perform_create(self, serializer):
         particular = serializer.validated_data['particular']
-        if particular.user != self.request.user:
+        user = self.request.user
+
+        if not (particular.user == user or user.profile in particular.owners.all()):
             raise ValidationError("Unauthorized")
 
         profile = self.request.user.profile
@@ -129,7 +160,10 @@ class ReminderUpdateView(RetrieveUpdateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return Reminder.objects.filter(particular__user=self.request.user)
+        user = self.request.user
+        return Reminder.objects.filter(
+            Q(particular__user=user) | Q(particular__owners=user.profile)
+        ).distinct()
 
 class NotificationListView(generics.ListAPIView):
     serializer_class = NotificationSerializer
@@ -348,3 +382,184 @@ class OrganizationDetailView(generics.RetrieveAPIView):
     queryset = Organization.objects.all()
     serializer_class = OrganizationDetailSerializer
     lookup_field = "organizational_id"
+
+
+@api_view(["POST", "DELETE"])
+@permission_classes([IsAuthenticated])
+def manage_particular_owner(request, particular_id):
+    """
+    POST   -> add owner
+    DELETE -> remove owner
+    """
+    profile = request.user.profile
+    particular = get_object_or_404(Particular, id=particular_id)
+
+    # ✅ Must belong to an organization + be admin
+    if not profile.organization or profile.organization.admin != profile:
+        return Response({"error": "Only organization admin can manage owners."}, status=403)
+
+    target_profile_id = request.data.get("profile_id")
+    if not target_profile_id:
+        return Response({"error": "profile_id is required."}, status=400)
+
+    target_profile = get_object_or_404(Profile, id=target_profile_id)
+
+    # ✅ Ensure target is in same organization
+    if target_profile.organization != profile.organization:
+        return Response({"error": "Profile does not belong to your organization."}, status=403)
+
+    if request.method == "POST":
+        particular.owners.add(target_profile)
+        return Response({
+            "status": "assigned",
+            "particular_id": particular.id,
+            "profile_id": target_profile.id,
+            "message": f"{target_profile.user.username} assigned to {particular.title}."
+        }, status=200)
+
+    elif request.method == "DELETE":
+        if target_profile == particular.user.profile:
+            return Response({"error": "Cannot remove the document creator."}, status=400)
+
+        particular.owners.remove(target_profile)
+        return Response({
+            "status": "removed",
+            "particular_id": particular.id,
+            "profile_id": target_profile.id,
+            "message": f"{target_profile.user.username} removed from {particular.title}."
+        }, status=200)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def staff_particulars_view(request, profile_id):
+    """
+    Admin-only endpoint: fetch all particulars created by or owned by a staff member.
+    """
+    admin_profile = request.user.profile
+    staff_profile = get_object_or_404(Profile, id=profile_id)
+
+    # ✅ Must belong to an organization + be admin
+    if not admin_profile.organization or admin_profile.organization.admin != admin_profile:
+        return Response({"error": "Only organization admin can view staff particulars."}, status=403)
+
+    if staff_profile.organization != admin_profile.organization:
+        return Response({"error": "Staff does not belong to your organization."}, status=403)
+
+    # ✅ Fetch created + owned particulars
+    created = Particular.objects.filter(user=staff_profile.user)
+    owned = Particular.objects.filter(owners=staff_profile)
+
+    data = {
+        "staff": {
+            "id": staff_profile.id,
+            "username": staff_profile.user.username,
+            "email": staff_profile.user.email,
+        },
+        "created_particulars": [
+            {"id": p.id, "title": p.title, "expiry_date": p.expiry_date}
+            for p in created
+        ],
+        "owned_particulars": [
+            {"id": p.id, "title": p.title, "expiry_date": p.expiry_date}
+            for p in owned
+        ],
+    }
+    return Response(data, status=200)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def send_message_view(request, profile_id):
+
+    admin_profile = request.user.profile
+    staff_profile = get_object_or_404(Profile, id=profile_id)
+
+    if not admin_profile.organization or admin_profile.organization.admin != admin_profile:
+        return Response({"error": "Only organization admin can send messages."}, status=403)
+
+    # ✅ ensure same organization
+    if staff_profile.organization != admin_profile.organization:
+        return Response({"error": "Staff not in your organization."}, status=403)
+
+    channel = request.data.get("channel")  # "sms" or "whatsapp"
+    message = request.data.get("message")
+
+    if not message:
+        return Response({"error": "Message is required"}, status=400)
+    if not staff_profile.phone_number:
+        return Response({"error": "Staff has no phone number"}, status=400)
+
+    try:
+        if channel == "sms":
+            client.messages.create(
+                body=message,
+                from_=TWILIO_PHONE_NUMBER,
+                to=staff_profile.phone_number
+            )
+            return Response({"success": f"SMS sent to {staff_profile.phone_number}"})
+
+        elif channel == "whatsapp":
+            client.messages.create(
+                body=message,
+                from_="whatsapp:" + TWILIO_PHONE_NUMBER,
+                to="whatsapp:" + staff_profile.phone_number
+            )
+            return Response({"success": f"WhatsApp sent to {staff_profile.phone_number}"})
+
+        else:
+            return Response({"error": "Invalid channel. Use 'sms' or 'whatsapp'."}, status=400)
+
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+    
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def delete_staff_view(request, profile_id):
+    """
+    Admin-only endpoint: delete a staff user under the same organization.
+    """
+    admin_profile = request.user.profile
+    staff_profile = get_object_or_404(Profile, id=profile_id)
+
+    # ✅ Ensure caller is an organization admin
+    if not admin_profile.organization or admin_profile.organization.admin != admin_profile:
+        return Response({"error": "Only organization admin can delete staff."}, status=403)
+
+    # ✅ Ensure staff is in the same organization
+    if staff_profile.organization != admin_profile.organization:
+        return Response({"error": "Staff does not belong to your organization."}, status=403)
+
+    # ✅ Prevent deleting the admin themselves
+    if staff_profile == admin_profile:
+        return Response({"error": "Admin cannot delete themselves."}, status=400)
+
+    # ✅ Delete user (cascade deletes profile too)
+    staff_profile.user.delete()
+
+    return Response(
+        {"message": f"User {staff_profile.user.username} deleted successfully."},
+        status=200
+    )
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def set_organization_icon(request, org_id):
+    profile = request.user.profile
+    org = get_object_or_404(Organization, organizational_id=org_id)
+
+    # ✅ Only admin can update
+    if org.admin != profile:
+        return Response({"error": "Only the admin can update organization icon."}, status=403)
+
+    file = request.FILES.get("icon")
+    if not file:
+        return Response({"error": "Icon file is required."}, status=400)
+
+    org.icon = file
+    org.save()
+
+    return Response({
+        "message": "Organization icon updated successfully.",
+        "icon_url": request.build_absolute_uri(org.icon.url)
+    })

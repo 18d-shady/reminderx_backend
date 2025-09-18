@@ -24,9 +24,16 @@ urlpatterns = [
     path('api/notifications/', NotificationListView.as_view(), name='notification-list'),
     path('api/bulk-create/', BulkParticularCreateView.as_view(), name='bulk-create'),
     path("api/manual-upgrade/", manual_upgrade, name="manual-upgrade"),
+
+     # Organization & Staff Management
     path("api/create-organization/", CreateOrganizationView.as_view(), name="create-organization"),
     path("api/verify-organization/", VerifyOrganizationView.as_view(), name="verify-organization"),
     path("api/verify-staff/", VerifyStaffView.as_view(), name="verify-staff"),
     path("api/organizations/<str:organizational_id>/", OrganizationDetailView.as_view(), name="organization-detail"),
+    path("api/particulars/<int:particular_id>/owners/", manage_particular_owner, name="manage_particular_owner"),
+    path("api/staff/<int:profile_id>/particulars/", staff_particulars_view, name="staff_particulars"),
+    path("api/staff/<int:profile_id>/send-message/", send_message_view, name="send_message"),
+    path("api/staff/<int:profile_id>/delete/", delete_staff_view, name="delete-staff"),
+    path("api/organizations/<str:org_id>/set-icon/", set_organization_icon, name="set-organization-icon"),
 
 ]
