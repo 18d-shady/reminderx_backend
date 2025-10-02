@@ -75,6 +75,7 @@ class Profile(models.Model):
     fcm_web_token = models.CharField(max_length=255, blank=True, null=True)
     fcm_android_token = models.CharField(max_length=255, blank=True, null=True)
     fcm_ios_token = models.CharField(max_length=255, blank=True, null=True)
+    subscription_expiry = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

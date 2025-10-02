@@ -36,4 +36,8 @@ urlpatterns = [
     path("api/staff/<int:profile_id>/delete/", delete_staff_view, name="delete-staff"),
     path("api/organizations/<str:org_id>/set-icon/", set_organization_icon, name="set-organization-icon"),
 
+    #payment
+    path("api/paystack/init/", PaystackInitView.as_view()),
+    path("api/paystack/verify/<str:reference>/", PaystackVerifyView.as_view()),
+
 ]

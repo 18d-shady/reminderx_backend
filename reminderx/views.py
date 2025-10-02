@@ -31,6 +31,7 @@ from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from twilio.rest import Client
+from .utils import initialize_transaction, verify_transaction
 
 
 TWILIO_ACCOUNT_SID = os.environ.get("TWILIO_ACCOUNT_SID")
@@ -563,3 +564,77 @@ def set_organization_icon(request, org_id):
         "message": "Organization icon updated successfully.",
         "icon_url": request.build_absolute_uri(org.icon.url)
     })
+
+PLAN_AMOUNTS = {
+    "premium": 150000,     # ₦1500.00 in kobo
+    "enterprise": 5000000, # ₦50000.00 in kobo
+    "multiusers": 10000000, # ₦100000.00 in kobo
+}
+
+class PaystackInitView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        email = request.data.get("email")
+        plan = request.data.get("plan")
+        callback_url = request.data.get("callback_url")
+
+        amount = PLAN_AMOUNTS.get(plan)
+        if not amount:
+            return Response({"status": False, "message": "Invalid plan"}, status=400)
+
+        result = initialize_transaction(email, amount, callback_url, plan, request.user.id)
+        return Response(result)
+
+from datetime import timedelta
+from django.utils.timezone import now
+
+class PaystackVerifyView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, reference):
+        result = verify_transaction(reference)
+
+        if not result.get("status"):
+            return Response({"error": "Verification failed"}, status=400)
+
+        data = result.get("data", {})
+        if data.get("status") != "success":
+            return Response({"error": "Transaction not successful"}, status=400)
+
+        plan = data.get("metadata", {}).get("plan")
+        amount_paid = data.get("amount", 0)  # in kobo
+
+        monthly_price = PLAN_AMOUNTS.get(plan)
+        if not monthly_price:
+            return Response({"error": "Unknown plan"}, status=400)
+
+        months_paid = amount_paid // monthly_price
+        if months_paid < 1:
+            return Response({"error": "Amount too low for selected plan"}, status=400)
+
+        # Upgrade user profile
+        profile = request.user.profile
+        try:
+            plan_obj = SubscriptionPlan.objects.get(name=plan)
+        except SubscriptionPlan.DoesNotExist:
+            return Response({"error": f"Plan {plan} not found"}, status=404)
+
+        profile.subscription_plan = plan_obj
+
+        # Calculate new expiry date
+        if profile.subscription_expiry and profile.subscription_expiry > now():
+            # extend current expiry
+            profile.subscription_expiry += timedelta(days=30 * months_paid)
+        else:
+            # start new subscription
+            profile.subscription_expiry = now() + timedelta(days=30 * months_paid)
+
+        profile.save()
+
+        return Response({
+            "status": "success",
+            "plan": plan,
+            "months_added": months_paid,
+            "new_expiry": profile.subscription_expiry,
+        })

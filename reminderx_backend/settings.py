@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
+from datetime import timedelta
 import os
 
 from pathlib import Path
@@ -58,6 +59,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'reminderx.middleware.SubscriptionMiddleware',
 ]
 
 ROOT_URLCONF = 'reminderx_backend.urls'
@@ -157,6 +159,17 @@ REST_FRAMEWORK = {
     ),
 }
 
+"""
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),  # 1 hour
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),    # 30 days
+    'ROTATE_REFRESH_TOKENS': False,
+    'BLACKLIST_AFTER_ROTATION': True,
+
+    'AUTH_HEADER_TYPES': ('Bearer',),
+}
+"""
+
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
@@ -172,6 +185,10 @@ EMAIL_USE_SSL = True
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
+PAYSTACK_SECRET_KEY = "sk_test_0a2248d8978d26fecbf95c7b736bd0650f6d21e1"
+PAYSTACK_PUBLIC_KEY = "pk_test_6ed1ae486ba3fe00fbec9a673c396828d8e22e78"
+PAYSTACK_BASE_URL = "https://api.paystack.co"
 
 
 #projects/reminderx/
@@ -229,6 +246,8 @@ more, less, tail, cat
 keytstore password naikas name naikas_key
 Is CN=Enyinnaya Omeruah, OU=Technology Department, O=Virtual Concept Technologies, L=Abuja, ST=FCT, C=NG correct?
 flutter build appbundle --release
+
 flutter build apk --release
+ab99ae09f94504dd891febdc808ed64e
 """
 
