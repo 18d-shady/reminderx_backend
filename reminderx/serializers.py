@@ -47,7 +47,7 @@ class ProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Profile
-        fields = [ 'user', 'phone_number', 'whatsapp_notifications', 'push_notifications', 'email_notifications', 'sms_notifications', 'reminder_time', 'subscription_plan', 'profile_picture', 'profile_picture_url',  'organization', 'role']
+        fields = [ 'user', 'phone_number', 'whatsapp_notifications', 'push_notifications', 'email_notifications', 'sms_notifications', 'reminder_time', 'subscription_plan', 'subscription_expiry', 'profile_picture', 'profile_picture_url',  'organization', 'role']
 
     def get_profile_picture_url(self, obj):
         request = self.context.get('request')

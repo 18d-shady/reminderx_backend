@@ -32,6 +32,8 @@ from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from twilio.rest import Client
 from .utils import initialize_transaction, verify_transaction
+from datetime import timedelta
+from django.utils.timezone import now
 
 
 TWILIO_ACCOUNT_SID = os.environ.get("TWILIO_ACCOUNT_SID")
@@ -579,6 +581,30 @@ class PaystackInitView(APIView):
         plan = request.data.get("plan")
         callback_url = request.data.get("callback_url")
 
+        if plan == "free":
+            profile = request.user.profile
+            if profile.subscription_expiry and profile.subscription_expiry > now():
+                return Response({
+                    "status": False,
+                    "message": f"You cannot downgrade to free until {profile.subscription_expiry}."
+                }, status=400)
+
+            # allow immediate downgrade (no Paystack call)
+            try:
+                free_plan = SubscriptionPlan.objects.get(name="free")
+                profile.subscription_plan = free_plan
+                profile.subscription_expiry = None
+                profile.save()
+            except SubscriptionPlan.DoesNotExist:
+                return Response({"status": False, "message": "Free plan not found"}, status=404)
+
+            return Response({
+                "status": True,
+                "plan": "free",
+                "message": "Downgraded to free plan."
+            })
+
+        # 🔹 Handle paid plan (normal Paystack flow)
         amount = PLAN_AMOUNTS.get(plan)
         if not amount:
             return Response({"status": False, "message": "Invalid plan"}, status=400)
@@ -586,8 +612,7 @@ class PaystackInitView(APIView):
         result = initialize_transaction(email, amount, callback_url, plan, request.user.id)
         return Response(result)
 
-from datetime import timedelta
-from django.utils.timezone import now
+
 
 class PaystackVerifyView(APIView):
     permission_classes = [IsAuthenticated]
